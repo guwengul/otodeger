@@ -21,7 +21,7 @@ export default async function YilPage({ params }: Props) {
 
   const { data: tipler } = await supabase
     .from('arac_tipleri')
-    .select('id, tip_adi, master_model_id')
+    .select('id, tip_adi')
     .eq('marka_adi', markaAdi);
 
   if (!tipler || tipler.length === 0) notFound();
@@ -35,23 +35,22 @@ export default async function YilPage({ params }: Props) {
   if (!kaskoTipler || kaskoTipler.length === 0) notFound();
 
   const mevcutTipIdler = new Set(kaskoTipler.map(k => k.arac_tip_id));
-  const mevcutMasterIdler = new Set(
-    tipler.filter(t => mevcutTipIdler.has(t.id) && t.master_model_id).map(t => t.master_model_id)
-  );
+  const ilkKelimeler = [...new Set(
+    tipler.filter(t => mevcutTipIdler.has(t.id)).map(t => t.tip_adi.split(' ')[0])
+  )];
 
-  let modeller: string[];
-  if (mevcutMasterIdler.size > 0) {
-    const { data: masterModeller } = await supabase
-      .from('master_modeller')
-      .select('model_adi')
-      .eq('marka_adi', markaAdi)
-      .in('id', [...mevcutMasterIdler]);
-    modeller = (masterModeller ?? []).map(m => m.model_adi).sort();
-  } else {
-    modeller = [...new Set(
-      tipler.filter(t => mevcutTipIdler.has(t.id)).map(t => t.tip_adi.split(' ')[0])
-    )].sort();
-  }
+  // master_modeller'de bu ilk kelimelerle eşleşen kayıtları çek
+  // (kullanıcı master tablosunda model adını değiştirirse burası güncellenir)
+  const { data: masterModeller } = await supabase
+    .from('master_modeller')
+    .select('model_adi')
+    .eq('marka_adi', markaAdi)
+    .in('model_adi', ilkKelimeler);
+
+  const modeller = (masterModeller && masterModeller.length > 0
+    ? masterModeller.map(m => m.model_adi)
+    : ilkKelimeler
+  ).sort();
 
   return (
     <div>

@@ -21,7 +21,7 @@ export default async function YilPage({ params }: Props) {
 
   const { data: tipler } = await supabase
     .from('arac_tipleri')
-    .select('id, tip_adi')
+    .select('id, tip_adi, master_model_id')
     .eq('marka_adi', markaAdi);
 
   if (!tipler || tipler.length === 0) notFound();
@@ -35,9 +35,23 @@ export default async function YilPage({ params }: Props) {
   if (!kaskoTipler || kaskoTipler.length === 0) notFound();
 
   const mevcutTipIdler = new Set(kaskoTipler.map(k => k.arac_tip_id));
-  const modeller = [...new Set(
-    tipler.filter(t => mevcutTipIdler.has(t.id)).map(t => t.tip_adi.split(' ')[0])
-  )].sort();
+  const mevcutMasterIdler = new Set(
+    tipler.filter(t => mevcutTipIdler.has(t.id) && t.master_model_id).map(t => t.master_model_id)
+  );
+
+  let modeller: string[];
+  if (mevcutMasterIdler.size > 0) {
+    const { data: masterModeller } = await supabase
+      .from('master_modeller')
+      .select('model_adi')
+      .eq('marka_adi', markaAdi)
+      .in('id', [...mevcutMasterIdler]);
+    modeller = (masterModeller ?? []).map(m => m.model_adi).sort();
+  } else {
+    modeller = [...new Set(
+      tipler.filter(t => mevcutTipIdler.has(t.id)).map(t => t.tip_adi.split(' ')[0])
+    )].sort();
+  }
 
   return (
     <div>

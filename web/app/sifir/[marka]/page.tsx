@@ -25,17 +25,21 @@ export default async function SifirMarkaPage({ params }: Props) {
     .from('sifir_fiyatlari')
     .select('model_adi, versiyon, fiyat')
     .eq('marka_adi', markaAdi)
-    .order('model_adi')
     .order('fiyat');
 
   if (!data || data.length === 0) notFound();
 
-  // Modele göre grupla
+  // Modele göre grupla, min fiyata göre sırala
   const gruplar = new Map<string, { versiyon: string; fiyat: number }[]>();
   for (const row of data) {
     if (!gruplar.has(row.model_adi)) gruplar.set(row.model_adi, []);
     gruplar.get(row.model_adi)!.push({ versiyon: row.versiyon, fiyat: row.fiyat });
   }
+
+  // Her modelin min fiyatına göre sırala (ekonomikten premium'a)
+  const siraliGruplar = [...gruplar.entries()].sort(
+    (a, b) => Math.min(...a[1].map(v => v.fiyat)) - Math.min(...b[1].map(v => v.fiyat))
+  );
 
   return (
     <div>
@@ -44,7 +48,7 @@ export default async function SifirMarkaPage({ params }: Props) {
       <p className="text-gray-500 mb-8">{gruplar.size} model · {data.length} versiyon</p>
 
       <div className="flex flex-col gap-6">
-        {[...gruplar.entries()].map(([model, versiyonlar]) => (
+        {siraliGruplar.map(([model, versiyonlar]) => (
           <div key={model} className="rounded-lg border bg-white overflow-hidden">
             <div className="px-4 py-3 border-b bg-gray-50">
               <h2 className="text-sm font-semibold">{model}</h2>

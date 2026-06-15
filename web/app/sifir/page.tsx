@@ -21,15 +21,15 @@ export default async function SifirPage() {
       <h1 className="text-2xl font-semibold mb-1">Sıfır Araç Fiyatları</h1>
       <p className="text-gray-500 mb-8">Güncel liste fiyatları</p>
 
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {markalar.map((m: { marka_adi: string; model_sayisi: number; versiyon_sayisi: number }) => (
           <Link
             key={m.marka_adi}
             href={`/sifir/${toSlug(m.marka_adi)}`}
-            className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 hover:border-gray-400 transition-colors"
+            className="rounded-lg border bg-white px-4 py-3 hover:border-gray-400 transition-colors"
           >
-            <span className="text-sm font-medium">{m.marka_adi}</span>
-            <span className="text-xs text-gray-400">{m.model_sayisi} model · {m.versiyon_sayisi} versiyon</span>
+            <div className="text-sm font-medium">{m.marka_adi}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{m.model_sayisi} model</div>
           </Link>
         ))}
       </div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const navLinks = [
   { href: '/', label: 'Sorgula' },
+  { href: '/sifir', label: 'Sıfır Fiyatlar' },
   { href: '/garajim', label: 'Garajım' },
   { href: '/hesapla', label: 'Hesapla' },
   { href: '/analiz', label: 'Analiz' },

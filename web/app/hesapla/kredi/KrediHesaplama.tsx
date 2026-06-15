@@ -49,7 +49,7 @@ export default function KrediHesaplama() {
   }, [tutar, vade, yillikFaiz]);
 
   return (
-    <div className="max-w-lg">
+    <div className="w-full max-w-lg">
       {/* Girişler */}
       <div className="rounded-lg border bg-white p-6 flex flex-col gap-5 mb-4">
 

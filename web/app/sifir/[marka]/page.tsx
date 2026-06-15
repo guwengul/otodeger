@@ -55,9 +55,9 @@ export default async function SifirMarkaPage({ params }: Props) {
             </div>
             <div className="divide-y">
               {versiyonlar.map((v, i) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-gray-700">{v.versiyon}</span>
-                  <span className="text-sm font-semibold shrink-0 ml-4">{formatPara(v.fiyat)}</span>
+                <div key={i} className="flex items-start justify-between px-4 py-3 gap-4">
+                  <span className="text-sm text-gray-700 min-w-0">{v.versiyon}</span>
+                  <span className="text-sm font-semibold shrink-0">{formatPara(v.fiyat)}</span>
                 </div>
               ))}
             </div>

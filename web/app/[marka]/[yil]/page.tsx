@@ -39,18 +39,7 @@ export default async function YilPage({ params }: Props) {
     tipler.filter(t => mevcutTipIdler.has(t.id)).map(t => t.tip_adi.split(' ')[0])
   )];
 
-  // master_modeller'de bu ilk kelimelerle eşleşen kayıtları çek
-  // (kullanıcı master tablosunda model adını değiştirirse burası güncellenir)
-  const { data: masterModeller } = await supabase
-    .from('master_modeller')
-    .select('model_adi')
-    .eq('marka_adi', markaAdi)
-    .in('model_adi', ilkKelimeler);
-
-  const modeller = (masterModeller && masterModeller.length > 0
-    ? masterModeller.map(m => m.model_adi)
-    : ilkKelimeler
-  ).sort();
+  const modeller = ilkKelimeler.sort();
 
   return (
     <div>

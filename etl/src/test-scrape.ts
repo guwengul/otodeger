@@ -1,4 +1,5 @@
 // Tek marka için dry-run — Supabase'e yazmaz, sadece parse sonucunu gösterir
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import { parse as parseHtml } from 'node-html-parser';
 
 const MARKA_SLUG = 'toyota'; // bunu değiştirerek test edin

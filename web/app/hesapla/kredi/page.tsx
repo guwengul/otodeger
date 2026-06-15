@@ -1,5 +1,17 @@
 import type { Metadata } from 'next';
-export const metadata: Metadata = { title: 'Kredi Hesaplama' };
-export default function Page() {
-  return <div className="text-center py-20"><p className="text-gray-400 text-sm">Bu özellik yakında geliyor</p></div>;
+import KrediHesaplama from './KrediHesaplama';
+
+export const metadata: Metadata = {
+  title: 'Araç Kredisi Hesaplama',
+  description: 'Türkiye\'de araç kredisi taksit, KKDF ve BSMV dahil toplam maliyet hesaplama.',
+};
+
+export default function KrediPage() {
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold mb-1">Araç Kredisi Hesaplama</h1>
+      <p className="text-gray-500 mb-8">KKDF ve BSMV dahil toplam maliyet</p>
+      <KrediHesaplama />
+    </div>
+  );
 }

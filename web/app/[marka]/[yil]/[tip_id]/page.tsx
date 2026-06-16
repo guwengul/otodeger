@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { fromSlug, formatPara } from '@/lib/utils';
+import { formatPara } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ marka: string; yil: string; model: string; tip_id: string }> };
+type Props = { params: Promise<{ marka: string; yil: string; tip_id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { tip_id, yil } = await params;
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function TipPage({ params }: Props) {
-  const { marka, yil, model, tip_id } = await params;
+  const { marka, yil, tip_id } = await params;
   const aracYili = parseInt(yil);
   const tipId = parseInt(tip_id);
   if (isNaN(aracYili) || isNaN(tipId)) notFound();
@@ -32,7 +32,7 @@ export default async function TipPage({ params }: Props) {
 
   return (
     <div>
-      <Link href={`/${marka}/${yil}/${model}`} className="text-sm text-gray-500 hover:text-gray-900">← Geri</Link>
+      <Link href={`/${marka}/${yil}`} className="text-sm text-gray-500 hover:text-gray-900">← Geri</Link>
 
       <h1 className="text-2xl font-semibold mt-4">{tip.marka_adi} {tip.tip_adi}</h1>
       <p className="text-gray-500 mt-1 mb-8">{aracYili} Model Yılı</p>

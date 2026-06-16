@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { formatPara } from '@/lib/utils';
 
@@ -18,31 +18,53 @@ type Tip = {
 const YAKIT_TIPLERI = ['Benzin', 'Dizel', 'Elektrik', 'Hibrit', 'LPG'];
 const SANZIMAN_TIPLERI = ['Manuel', 'Otomatik', 'Yarı Otomatik'];
 
+function normalize(s: string) {
+  return s.toUpperCase().replace(/[AEIİOUÖÜ\s]/g, '');
+}
+
+function isMatch(query: string, target: string) {
+  const q = query.toUpperCase().trim();
+  const t = target.toUpperCase();
+  if (t.includes(q)) return true;
+  const qn = normalize(query);
+  const tn = normalize(target);
+  return qn.length > 0 && tn.includes(qn);
+}
+
 export default function TipListesi({
   tipler,
   marka,
   yil,
-  model,
 }: {
   tipler: Tip[];
   marka: string;
   yil: string;
-  model: string;
 }) {
+  const [arama, setArama] = useState('');
   const [yakit, setYakit] = useState<string | null>(null);
   const [sanziman, setSanziman] = useState<string | null>(null);
 
   const mevcutYakitlar = [...new Set(tipler.map(t => t.ozellik?.yakit_tipi).filter(Boolean))] as string[];
   const mevcutSanzimanlar = [...new Set(tipler.map(t => t.ozellik?.sanziman).filter(Boolean))] as string[];
 
-  const filtrelenmis = tipler.filter(t => {
+  const filtrelenmis = useMemo(() => tipler.filter(t => {
     if (yakit && t.ozellik?.yakit_tipi !== yakit) return false;
     if (sanziman && t.ozellik?.sanziman !== sanziman) return false;
+    if (arama.trim().length > 0 && !isMatch(arama, t.tip_adi)) return false;
     return true;
-  });
+  }), [tipler, yakit, sanziman, arama]);
 
   return (
     <div>
+      <input
+        type="text"
+        placeholder="Model ara... (Golf, Corolla, Astra...)"
+        value={arama}
+        onChange={e => setArama(e.target.value)}
+        className="w-full rounded-lg border bg-white px-4 py-3 text-sm outline-none focus:border-gray-400 transition-colors mb-4"
+        autoFocus
+      />
+
       {(mevcutYakitlar.length > 0 || mevcutSanzimanlar.length > 0) && (
         <div className="flex flex-wrap gap-2 mb-6">
           {YAKIT_TIPLERI.filter(y => mevcutYakitlar.includes(y)).map(y => (
@@ -79,12 +101,12 @@ export default function TipListesi({
 
       <div className="flex flex-col gap-2">
         {filtrelenmis.length === 0 ? (
-          <p className="text-sm text-gray-400 py-8 text-center">Bu filtreyle eşleşen araç bulunamadı</p>
+          <p className="text-sm text-gray-400 py-8 text-center">Eşleşen araç bulunamadı</p>
         ) : (
           filtrelenmis.map(k => (
             <Link
               key={k.arac_tip_id}
-              href={`/${marka}/${yil}/${model}/${k.arac_tip_id}`}
+              href={`/${marka}/${yil}/${k.arac_tip_id}`}
               className="flex items-center justify-between rounded-lg border bg-white px-4 py-3 hover:border-gray-400 transition-colors"
             >
               <div>

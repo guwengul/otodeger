@@ -18,17 +18,22 @@ type Tip = {
 const YAKIT_TIPLERI = ['Benzin', 'Dizel', 'Elektrik', 'Hibrit', 'LPG'];
 const SANZIMAN_TIPLERI = ['Manuel', 'Otomatik', 'Yarı Otomatik'];
 
-function normalize(s: string) {
-  return s.toUpperCase().replace(/[AEIİOUÖÜ\s]/g, '');
+function normalizeWord(s: string) {
+  return s.toUpperCase().replace(/[AEIİOUÖÜ]/g, '');
 }
 
 function isMatch(query: string, target: string) {
   const q = query.toUpperCase().trim();
+  if (q.length === 0) return true;
   const t = target.toUpperCase();
   if (t.includes(q)) return true;
-  const qn = normalize(query);
-  const tn = normalize(target);
-  return qn.length > 0 && tn.includes(qn);
+
+  const qn = normalizeWord(query);
+  if (qn.length === 0) return false;
+
+  // Sesli harf normalizasyonu kelime bazında yapılır, kelimeler birleştirilmez
+  // (aksi halde "DSG"+"LIFE" -> "DSGLF" gibi rastlantısal eşleşmeler oluşur)
+  return t.split(/\s+/).some(word => normalizeWord(word).includes(qn));
 }
 
 export default function TipListesi({

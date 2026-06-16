@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { fromSlug, toSlug } from '@/lib/utils';
+import { fromSlug } from '@/lib/utils';
+import ModelArama from '@/components/ModelArama';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -45,19 +46,9 @@ export default async function YilPage({ params }: Props) {
     <div>
       <Link href={`/${marka}`} className="text-sm text-gray-500 hover:text-gray-900">← {markaAdi}</Link>
       <h1 className="text-2xl font-semibold mt-4 mb-1">{markaAdi} {yil}</h1>
-      <p className="text-gray-500 mb-8">Model seçin</p>
+      <p className="text-gray-500 mb-8">Model seçin veya arayın</p>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {modeller.map(model => (
-          <Link
-            key={model}
-            href={`/${marka}/${yil}/${toSlug(model)}`}
-            className="rounded-lg border bg-white px-4 py-3 text-sm font-medium hover:border-gray-400 transition-colors"
-          >
-            {model}
-          </Link>
-        ))}
-      </div>
+      <ModelArama modeller={modeller} marka={marka} yil={yil} />
     </div>
   );
 }

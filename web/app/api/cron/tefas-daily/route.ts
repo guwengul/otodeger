@@ -85,11 +85,11 @@ export async function GET(request: Request) {
   }
 
   // Supabase'e yaz
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY,
-    );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && supabaseKey) {
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const rows = funds.map(f => ({ ...f, created_at: new Date().toISOString() }));
     const { error: dbErr } = await supabase
       .from('tefas_fon_verileri')

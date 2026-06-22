@@ -72,10 +72,16 @@ export async function GET(request: Request) {
       waitUntil: 'networkidle2',
       timeout: 40000,
     });
-    steps.push('8_page_loaded');
+    const title = await page.title();
+    const url = page.url();
+    steps.push('8_page_loaded:title=' + title + ':url=' + url.slice(0, 60));
 
-    await new Promise(r => setTimeout(r, 5000));
+    // Daha uzun bekle — JS challenge çözülüyor olabilir
+    await new Promise(r => setTimeout(r, 10000));
     steps.push('9_waited');
+
+    const title2 = await page.title();
+    steps.push('9b_title_after_wait=' + title2);
 
     await browser.close();
     steps.push('10_done');

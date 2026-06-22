@@ -1,12 +1,70 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const CHROMIUM_URL =
-  'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
-const TEFAS_FON = 'https://www.tefas.gov.tr/tr/fon-verileri';
+const TEFAS_BASE = 'https://www.tefas.gov.tr/api/funds';
+const PAGE_SIZE = 100; // 25 min, 100 max test et
+
+function dateStr(daysAgo = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function lastBusinessDay(): string {
+  const d = new Date();
+  // Bugün pazar (0) veya cumartesi (6) ise geri git
+  do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function tefasPost(endpoint: string, body: Record<string, unknown>, token: string) {
+  const res = await fetch(`${TEFAS_BASE}/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': '*/*',
+      'Authorization': `Bearer ${token}`,
+      'Origin': 'https://www.tefas.gov.tr',
+      'Referer': 'https://www.tefas.gov.tr/tr/fon-verileri',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+async function fetchAllFunds(tarih: string, token: string) {
+  const allFunds: Record<string, unknown>[] = [];
+
+  const first = await tefasPost('fonGnlBlgSiraliGetir', {
+    fonTipi: 'YAT', fonKodu: null, aramaMetni: null, fonTurKod: null,
+    fonGrubu: null, sfonTurKod: null, basTarih: tarih, bitTarih: tarih,
+    basSira: 1, bitSira: PAGE_SIZE, fonTurAciklama: null, dil: 'TR', kurucuKod: null,
+  }, token);
+
+  if (!first.resultList?.length) return { funds: [], error: first.errorMessage };
+
+  allFunds.push(...first.resultList);
+  const total = first.toplamSayi as number;
+  console.log(`[TEFAS] ${tarih}: toplam ${total} fon, ${first.toplamSayfa} sayfa`);
+
+  for (let start = PAGE_SIZE + 1; start <= total; start += PAGE_SIZE) {
+    await new Promise(r => setTimeout(r, 200));
+    const page = await tefasPost('fonGnlBlgSiraliGetir', {
+      fonTipi: 'YAT', fonKodu: null, aramaMetni: null, fonTurKod: null,
+      fonGrubu: null, sfonTurKod: null, basTarih: tarih, bitTarih: tarih,
+      basSira: start, bitSira: start + PAGE_SIZE - 1,
+      fonTurAciklama: null, dil: 'TR', kurucuKod: null,
+    }, token);
+    if (page.resultList) allFunds.push(...page.resultList);
+  }
+
+  return { funds: allFunds, error: null };
+}
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -14,62 +72,34 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const steps: string[] = [];
-
-  try {
-    steps.push('1_start');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const chromium = require('@sparticuz/chromium-min');
-    const executablePath = await chromium.executablePath(CHROMIUM_URL);
-    steps.push('2_chromium_ok');
-
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const puppeteer = require('puppeteer-core');
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath,
-      headless: true,
-    });
-    steps.push('3_browser_ok');
-
-    const page = await browser.newPage();
-
-    // Puppeteer native response interception
-    const captured: { ep: string; reqBody: string; resBody: string }[] = [];
-
-    page.on('response', async (res: { url: () => string; text: () => Promise<string>; request: () => { postData: () => string | null } }) => {
-      const url = res.url();
-      if (url.includes('tefas.gov.tr/api/')) {
-        const ep = url.split('/api/')[1] || url;
-        let resBody = '';
-        let reqBody = '';
-        try { resBody = await res.text(); } catch { /* ignore */ }
-        try { reqBody = res.request().postData() || ''; } catch { /* ignore */ }
-        captured.push({ ep, reqBody, resBody: resBody.slice(0, 600) });
-      }
-    });
-
-    steps.push('4_listeners_set');
-
-    await page.goto(TEFAS_FON, { waitUntil: 'networkidle2', timeout: 40000 });
-    const title1 = await page.title();
-    steps.push('5_goto_done_title=' + title1.slice(0, 40));
-
-    // F5 challenge sonrası sayfa yeniden yüklenebilir — bekle
-    await new Promise((r) => setTimeout(r, 12000));
-    const title2 = await page.title();
-    steps.push('6_after_wait_title=' + title2.slice(0, 40));
-
-    await browser.close();
-    steps.push('7_done');
-
-    return NextResponse.json({
-      ok: true,
-      steps,
-      captured_count: captured.length,
-      tefas_apis: captured,
-    });
-  } catch (e) {
-    return NextResponse.json({ error: String(e).slice(0, 500), steps }, { status: 500 });
+  const token = process.env.TEFAS_BEARER_TOKEN;
+  if (!token) {
+    return NextResponse.json({ error: 'TEFAS_BEARER_TOKEN env var eksik' }, { status: 500 });
   }
+
+  const tarih = lastBusinessDay();
+  const { funds, error } = await fetchAllFunds(tarih, token);
+
+  if (error || funds.length === 0) {
+    return NextResponse.json({ error: error || 'Veri gelmedi', tarih }, { status: 500 });
+  }
+
+  // Supabase'e yaz
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY,
+    );
+    const rows = funds.map(f => ({ ...f, created_at: new Date().toISOString() }));
+    const { error: dbErr } = await supabase
+      .from('tefas_fon_verileri')
+      .upsert(rows, { onConflict: 'tarih,fonKodu' });
+    if (dbErr) console.error('[SUPABASE]', dbErr.message);
+  }
+
+  return NextResponse.json({
+    tarih,
+    fonSayisi: funds.length,
+    ornek: funds.slice(0, 2),
+  });
 }

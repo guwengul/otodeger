@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
-import chromium from '@sparticuz/chromium-min';
-import { chromium as playwrightChromium } from 'playwright-core';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const chromium = require('@sparticuz/chromium-min');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { chromium: playwrightChromium } = require('playwright-core');
 
 const TEFAS_URL = 'https://www.tefas.gov.tr/tr/fon-verileri';
 

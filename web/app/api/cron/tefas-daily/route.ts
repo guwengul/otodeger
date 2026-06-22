@@ -6,6 +6,7 @@ export const maxDuration = 60;
 
 const CHROMIUM_URL =
   'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar';
+const TEFAS_FON = 'https://www.tefas.gov.tr/tr/fon-verileri';
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -17,83 +18,56 @@ export async function GET(request: Request) {
 
   try {
     steps.push('1_start');
-
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const chromium = require('@sparticuz/chromium-min');
-    steps.push('2_chromium_required');
-
     const executablePath = await chromium.executablePath(CHROMIUM_URL);
-    steps.push('3_executablePath:' + executablePath.slice(0, 40));
+    steps.push('2_chromium_ok');
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const puppeteer = require('puppeteer-core');
-    steps.push('4_puppeteer_required');
-
     const browser = await puppeteer.launch({
       args: chromium.args,
       executablePath,
       headless: true,
     });
-    steps.push('5_browser_launched');
-
-    const captured: { url: string; body: string; response: string }[] = [];
+    steps.push('3_browser_ok');
 
     const page = await browser.newPage();
-    steps.push('6_page_created');
 
-    // Intercept CDP ile network isteklerini yakala
-    const client = await page.createCDPSession();
-    await client.send('Network.enable');
+    // Puppeteer native response interception
+    const captured: { ep: string; reqBody: string; resBody: string }[] = [];
 
-    const requestBodies: Record<string, string> = {};
-
-    client.on('Network.requestWillBeSent', (e: { requestId: string; request: { url: string; method: string; postData?: string } }) => {
-      if (e.request.url.includes('/api/funds/') && e.request.method === 'POST') {
-        requestBodies[e.requestId] = e.request.postData || '';
+    page.on('response', async (res: { url: () => string; text: () => Promise<string>; request: () => { postData: () => string | null } }) => {
+      const url = res.url();
+      if (url.includes('tefas.gov.tr/api/')) {
+        const ep = url.split('/api/')[1] || url;
+        let resBody = '';
+        let reqBody = '';
+        try { resBody = await res.text(); } catch { /* ignore */ }
+        try { reqBody = res.request().postData() || ''; } catch { /* ignore */ }
+        captured.push({ ep, reqBody, resBody: resBody.slice(0, 600) });
       }
     });
 
-    client.on('Network.responseReceived', async (e: { requestId: string; response: { url: string } }) => {
-      if (e.response.url.includes('/api/funds/')) {
-        try {
-          const resp = await client.send('Network.getResponseBody', { requestId: e.requestId });
-          captured.push({
-            url: e.response.url,
-            body: requestBodies[e.requestId] || '',
-            response: resp.body?.slice(0, 600) || '',
-          });
-        } catch { /* ignore */ }
-      }
-    });
+    steps.push('4_listeners_set');
 
-    steps.push('7_cdp_setup');
+    await page.goto(TEFAS_FON, { waitUntil: 'networkidle2', timeout: 40000 });
+    const title1 = await page.title();
+    steps.push('5_goto_done_title=' + title1.slice(0, 40));
 
-    await page.goto('https://www.tefas.gov.tr/tr/fon-verileri', {
-      waitUntil: 'networkidle2',
-      timeout: 40000,
-    });
-    const title = await page.title();
-    const url = page.url();
-    steps.push('8_page_loaded:title=' + title + ':url=' + url.slice(0, 60));
-
-    // Daha uzun bekle — JS challenge çözülüyor olabilir
-    await new Promise(r => setTimeout(r, 10000));
-    steps.push('9_waited');
-
+    // F5 challenge sonrası sayfa yeniden yüklenebilir — bekle
+    await new Promise((r) => setTimeout(r, 12000));
     const title2 = await page.title();
-    steps.push('9b_title_after_wait=' + title2);
+    steps.push('6_after_wait_title=' + title2.slice(0, 40));
 
     await browser.close();
-    steps.push('10_done');
-
-    const fonGnl = captured.filter(r => r.url.includes('fonGnlBlgSiraliGetir'));
-    const diger = captured.filter(r => !r.url.includes('fonGnlBlgSiraliGetir'));
+    steps.push('7_done');
 
     return NextResponse.json({
       ok: true,
       steps,
-      fonGnlBlgSiraliGetir: fonGnl,
-      diger_apiler: diger.map(r => ({ ep: r.url.split('/').pop(), body: r.body.slice(0, 100), resp: r.response.slice(0, 100) })),
+      captured_count: captured.length,
+      tefas_apis: captured,
     });
   } catch (e) {
     return NextResponse.json({ error: String(e).slice(0, 500), steps }, { status: 500 });

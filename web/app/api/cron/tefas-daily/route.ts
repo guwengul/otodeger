@@ -64,7 +64,8 @@ export async function GET(request: Request) {
   const page = await context.newPage();
 
   // API çağrılarını yakala
-  page.on('request', req => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page.on('request', (req: any) => {
     if (req.url().includes('/api/funds/') && req.method() === 'POST') {
       capturedRequests.push({
         url: req.url(),
@@ -74,9 +75,10 @@ export async function GET(request: Request) {
     }
   });
 
-  page.on('response', async res => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page.on('response', async (res: any) => {
     if (res.url().includes('/api/funds/') && res.request().method() === 'POST') {
-      const idx = capturedRequests.findLastIndex(r => r.url === res.url() && !r.response);
+      const idx = capturedRequests.findLastIndex((r: { url: string; response: string }) => r.url === res.url() && !r.response);
       if (idx >= 0) {
         try { capturedRequests[idx].response = await res.text(); } catch { /* ignore */ }
       }

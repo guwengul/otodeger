@@ -21,7 +21,7 @@ function lastBusinessDay() {
   return `${y}${m}${day}`;
 }
 
-export const maxDuration = 60; // Vercel Pro: 60s, Hobby: 10s
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -31,15 +31,27 @@ export async function GET(request: Request) {
 
   const isLocal = process.env.NODE_ENV === 'development';
 
-  const browser = await playwrightChromium.launch({
-    args: isLocal ? [] : chromium.args,
-    executablePath: isLocal
+  let executablePath: string | undefined;
+  try {
+    executablePath = isLocal
       ? undefined
       : await chromium.executablePath(
           'https://github.com/Sparticuz/chromium/releases/download/v133.0.0/chromium-v133.0.0-pack.tar'
-        ),
-    headless: true,
-  });
+        );
+  } catch (e) {
+    return NextResponse.json({ error: 'executablePath hatası', detail: String(e).slice(0, 200) }, { status: 500 });
+  }
+
+  let browser;
+  try {
+    browser = await playwrightChromium.launch({
+      args: isLocal ? [] : chromium.args,
+      executablePath,
+      headless: true,
+    });
+  } catch (e) {
+    return NextResponse.json({ error: 'Browser launch hatası', detail: String(e).slice(0, 300) }, { status: 500 });
+  }
 
   const capturedRequests: { url: string; body: string; response: string }[] = [];
   const context = await browser.newContext();

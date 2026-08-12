@@ -1,4 +1,7 @@
 {
+  "buildCommand": "cd web && npm run build",
+  "outputDirectory": "web/.next",
+  "installCommand": "npm install && cd web && npm install",
   "framework": "nextjs",
   "crons": [
     {

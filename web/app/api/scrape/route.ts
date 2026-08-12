@@ -21,14 +21,34 @@ function parseIlanDetay(html: string) {
                    get(/id="[^"]*price[^"]*"[^>]*>([\s\S]*?)<\//i);
   const fiyat = fiyatRaw ? parseInt(fiyatRaw.replace(/\./g, '').replace(/[^\d]/g, '')) || null : null;
 
-  // classifiedInfoList — tüm key/value çiftleri
+  // Tüm key/value çiftleri — sahibinden + arabam.com
   const ozellikler: Record<string, string> = {};
+
+  // sahibinden: <li><strong>Marka</strong><span>BMW</span></li>
   const liRegex = /<li[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>[\s\S]*?<\/li>/g;
   let liM;
   while ((liM = liRegex.exec(html)) !== null) {
     const key = liM[1].replace(/<[^>]+>/g, '').trim();
     const val = liM[2].replace(/<[^>]+>/g, '').trim();
-    if (key && val && key.length < 50) ozellikler[key] = val;
+    if (key && val && key.length < 60) ozellikler[key] = val;
+  }
+
+  // arabam.com: <tr><th>Marka</th><td>Fiat</td></tr>
+  const trRegex = /<tr[^>]*>[\s\S]*?<th[^>]*>([\s\S]*?)<\/th>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>[\s\S]*?<\/tr>/g;
+  let trM;
+  while ((trM = trRegex.exec(html)) !== null) {
+    const key = trM[1].replace(/<[^>]+>/g, '').trim();
+    const val = trM[2].replace(/<[^>]+>/g, '').trim();
+    if (key && val && key.length < 60) ozellikler[key] = val;
+  }
+
+  // arabam.com: data-testid veya class tabanlı özellikler
+  const dtRegex = /<dt[^>]*>([\s\S]*?)<\/dt>[\s\S]*?<dd[^>]*>([\s\S]*?)<\/dd>/g;
+  let dtM;
+  while ((dtM = dtRegex.exec(html)) !== null) {
+    const key = dtM[1].replace(/<[^>]+>/g, '').trim();
+    const val = dtM[2].replace(/<[^>]+>/g, '').trim();
+    if (key && val && key.length < 60) ozellikler[key] = val;
   }
 
   // Resimler
@@ -110,7 +130,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Fetch hatası: ${e instanceof Error ? e.message : e}` }, { status: 502 });
   }
 
-  if (html.includes('sahibinden.com Giriş') || (html.includes('Giriş Yap') && !html.includes('classifiedDetail'))) {
+  if (html.includes('sahibinden.com Giriş') || html.includes('secure.sahibinden.com/giris')) {
     return NextResponse.json({ error: 'sahibinden login duvarı' }, { status: 403 });
   }
 

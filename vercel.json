@@ -1,12 +1,1 @@
-{
-  "buildCommand": "cd web && npm run build",
-  "outputDirectory": "web/.next",
-  "installCommand": "npm install && cd web && npm install",
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/tefas-daily",
-      "schedule": "0 20 * * 1-5"
-    }
-  ]
-}
+{}

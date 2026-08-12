@@ -217,14 +217,25 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'sahibinden login duvarı' }, { status: 403 });
   }
 
-  // ?debug=1 ile ham HTML snippet döner
+  // ?debug=1 ile araç özelliklerinin bulunduğu HTML bölümü döner
   if (searchParams.get('debug') === '1') {
-    const nextDataM = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    // "Marka", "Yakıt" veya "Kilometre" geçen en erken pozisyonu bul
+    const anchors = ['Marka', 'Yakıt', 'Kilometre', 'Vites', 'property', 'spec', 'detail'];
+    let pos = -1;
+    let found = '';
+    for (const a of anchors) {
+      const i = html.indexOf(a);
+      if (i !== -1 && (pos === -1 || i < pos)) { pos = i; found = a; }
+    }
+    const start = Math.max(0, pos - 200);
     return NextResponse.json({
-      hasNextData: !!nextDataM,
-      nextDataSnippet: nextDataM ? nextDataM[1].slice(0, 3000) : null,
-      htmlSnippet: html.slice(0, 3000),
       htmlLength: html.length,
+      anchorFound: found,
+      anchorPos: pos,
+      aroundAnchor: pos >= 0 ? html.slice(start, start + 4000) : null,
+      // Sabit offset örnekleri
+      at100k: html.slice(100000, 102000),
+      at200k: html.slice(200000, 202000),
     });
   }
 

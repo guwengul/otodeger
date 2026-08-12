@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const SCRAPEDO_TOKEN = process.env.SCRAPEDO_TOKEN || '';

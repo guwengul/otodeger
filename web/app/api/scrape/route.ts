@@ -217,6 +217,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'sahibinden login duvarı' }, { status: 403 });
   }
 
+  // ?debug=1 ile ham HTML snippet döner
+  if (searchParams.get('debug') === '1') {
+    const nextDataM = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    return NextResponse.json({
+      hasNextData: !!nextDataM,
+      nextDataSnippet: nextDataM ? nextDataM[1].slice(0, 3000) : null,
+      htmlSnippet: html.slice(0, 3000),
+      htmlLength: html.length,
+    });
+  }
+
   const data = parseIlanDetay(html);
   return NextResponse.json({ url, ...data });
 }

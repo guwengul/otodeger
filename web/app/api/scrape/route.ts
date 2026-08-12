@@ -77,7 +77,6 @@ export async function GET(request: Request) {
     token: SCRAPEDO_TOKEN,
     url,
     geoCode: 'tr',
-    render: 'false',
   });
 
   const r = await fetch(`https://api.scrape.do/?${params}`, {

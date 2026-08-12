@@ -18,32 +18,45 @@ function parseIlanDetay(html: string) {
 
   const ozellikler: Record<string, string> = {};
 
+  // ── arabam.com: gömülü JSON array [{Id, Key, Value, Type}] ──────────────
+  // Sayfada ~439k konumunda window.X veya inline script içinde geliyor
+  const arabamJsonM = html.match(/\[\s*\{"Id"\s*:\s*-?\d+\s*,\s*"Key"\s*:\s*"[^"]+"\s*,\s*"Value"\s*:([\s\S]{10,8000}?)\]\s*[;,\n]/);
+  if (arabamJsonM) {
+    try {
+      const arr = JSON.parse('[' + arabamJsonM[0].slice(1, arabamJsonM[0].lastIndexOf(']') + 1));
+      for (const item of arr) {
+        if (item && typeof item === 'object') {
+          const k = String(item.Key || '').trim();
+          const v = String(item.Value || '').trim();
+          if (k && v && k.length < 80) ozellikler[k] = v;
+        }
+      }
+    } catch { /* devam */ }
+  }
+
   // ── arabam.com: __NEXT_DATA__ JSON blob ──────────────────────────────────
   const nextDataM = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   if (nextDataM) {
     try {
       const nd = JSON.parse(nextDataM[1]);
-      // Geniş ilanDetay objesi genellikle props.pageProps.advert veya .listing altında
       const advert =
         nd?.props?.pageProps?.advert ||
         nd?.props?.pageProps?.listing ||
         nd?.props?.pageProps?.detail ||
         nd?.props?.pageProps;
-
       if (advert) {
-        // Özellik listesi: advert.properties veya advert.specs veya advert.attributes
         const specs: unknown[] =
           advert.properties || advert.specs || advert.attributes || advert.details || [];
         for (const s of specs) {
           if (s && typeof s === 'object') {
             const o = s as Record<string, unknown>;
-            const k = String(o.name || o.key || o.label || '').trim();
-            const v = String(o.value || o.val || '').trim();
+            const k = String(o.name || o.key || o.label || o.Key || '').trim();
+            const v = String(o.value || o.val || o.Value || '').trim();
             if (k && v && k.length < 80) ozellikler[k] = v;
           }
         }
       }
-    } catch { /* JSON parse hatası — devam et */ }
+    } catch { /* devam */ }
   }
 
   // ── sahibinden: <li><strong>Marka</strong><span>BMW</span></li> ──────────
@@ -55,18 +68,13 @@ function parseIlanDetay(html: string) {
     if (key && val && key.length < 60) ozellikler[key] = val;
   }
 
-  // ── arabam.com: class="property-item" ile iki span/div ───────────────────
-  // <div class="property-item"><span class="name">Marka</span><span class="value">Fiat</span></div>
-  const propRegex = /class="[^"]*property[-_]item[^"]*"[^>]*>([\s\S]*?)<\/(?:div|li)>/g;
+  // ── arabam.com: <div class="property-key">Marka</div><div class="property-value">Fiat</div>
+  const propRegex = /class="[^"]*property-key[^"]*"[^>]*>([\s\S]*?)<\/div>[\s\S]*?class="[^"]*property-value[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
   let propM;
   while ((propM = propRegex.exec(html)) !== null) {
-    const inner = propM[1];
-    const parts = [...inner.matchAll(/<(?:span|div|b|strong)[^>]*>([\s\S]*?)<\/(?:span|div|b|strong)>/g)];
-    if (parts.length >= 2) {
-      const key = stripTags(parts[0][1]);
-      const val = stripTags(parts[1][1]);
-      if (key && val && key.length < 60) ozellikler[key] = val;
-    }
+    const key = stripTags(propM[1]);
+    const val = stripTags(propM[2]);
+    if (key && val && key.length < 60) ozellikler[key] = val;
   }
 
   // ── arabam.com: <tr><th>...</th><td>...</td></tr> ────────────────────────
@@ -167,7 +175,7 @@ function parseIlanDetay(html: string) {
     model: ozellikler['Model'] ?? null,
     varyant: ozellikler['Donanım Paketi'] ?? ozellikler['Seri'] ?? null,
     yil: ozellikler['Yıl'] ?? null,
-    km: ozellikler['Kilometre'] ? parseInt(ozellikler['Kilometre'].replace(/\./g, '')) || null : null,
+    km: ozellikler['Kilometre'] ? parseInt(ozellikler['Kilometre'].replace(/\./g, '').replace(/[^\d]/g, '')) || null : null,
     yakit: ozellikler['Yakıt Tipi'] ?? null,
     vites: ozellikler['Vites Tipi'] ?? null,
     kasaTipi: ozellikler['Kasa Tipi'] ?? null,
@@ -217,31 +225,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'sahibinden login duvarı' }, { status: 403 });
   }
 
-  // ?debug=1 ile araç özelliklerinin bulunduğu HTML bölümü döner
-  if (searchParams.get('debug') === '1') {
-    // Tüm "Marka" konumlarını bul
-    const positions: number[] = [];
-    let idx = 0;
-    while ((idx = html.indexOf('Marka', idx)) !== -1) { positions.push(idx); idx++; }
-
-    // Her konumdaki 500 karakteri döndür
-    const markaChunks = positions.slice(0, 6).map(p => ({
-      pos: p,
-      chunk: html.slice(Math.max(0, p - 100), p + 400),
-    }));
-
-    // JSON blob ara: var X = { veya window.X =
-    const jsonBlobM = html.match(/(?:var\s+\w+\s*=\s*|window\.\w+\s*=\s*)(\{[\s\S]{50,2000}?"[Mm]arka"[\s\S]{0,2000}?\})/);
-
-    return NextResponse.json({
-      htmlLength: html.length,
-      markaPositions: positions,
-      markaChunks,
-      jsonBlobSnippet: jsonBlobM ? jsonBlobM[0].slice(0, 2000) : null,
-      at400k: html.slice(400000, 402000),
-      at500k: html.slice(500000, 502000),
-    });
-  }
 
   const data = parseIlanDetay(html);
   return NextResponse.json({ url, ...data });

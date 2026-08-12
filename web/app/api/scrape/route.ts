@@ -219,23 +219,27 @@ export async function GET(request: Request) {
 
   // ?debug=1 ile araç özelliklerinin bulunduğu HTML bölümü döner
   if (searchParams.get('debug') === '1') {
-    // "Marka", "Yakıt" veya "Kilometre" geçen en erken pozisyonu bul
-    const anchors = ['Marka', 'Yakıt', 'Kilometre', 'Vites', 'property', 'spec', 'detail'];
-    let pos = -1;
-    let found = '';
-    for (const a of anchors) {
-      const i = html.indexOf(a);
-      if (i !== -1 && (pos === -1 || i < pos)) { pos = i; found = a; }
-    }
-    const start = Math.max(0, pos - 200);
+    // Tüm "Marka" konumlarını bul
+    const positions: number[] = [];
+    let idx = 0;
+    while ((idx = html.indexOf('Marka', idx)) !== -1) { positions.push(idx); idx++; }
+
+    // Her konumdaki 500 karakteri döndür
+    const markaChunks = positions.slice(0, 6).map(p => ({
+      pos: p,
+      chunk: html.slice(Math.max(0, p - 100), p + 400),
+    }));
+
+    // JSON blob ara: var X = { veya window.X =
+    const jsonBlobM = html.match(/(?:var\s+\w+\s*=\s*|window\.\w+\s*=\s*)(\{[\s\S]{50,2000}?"[Mm]arka"[\s\S]{0,2000}?\})/);
+
     return NextResponse.json({
       htmlLength: html.length,
-      anchorFound: found,
-      anchorPos: pos,
-      aroundAnchor: pos >= 0 ? html.slice(start, start + 4000) : null,
-      // Sabit offset örnekleri
-      at100k: html.slice(100000, 102000),
-      at200k: html.slice(200000, 202000),
+      markaPositions: positions,
+      markaChunks,
+      jsonBlobSnippet: jsonBlobM ? jsonBlobM[0].slice(0, 2000) : null,
+      at400k: html.slice(400000, 402000),
+      at500k: html.slice(500000, 502000),
     });
   }
 

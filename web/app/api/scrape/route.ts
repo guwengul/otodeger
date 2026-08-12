@@ -12,16 +12,6 @@ function parseIlanDetay(html: string) {
     return m ? m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim() : null;
   };
 
-  const getAll = (pattern: RegExp) => {
-    const results: string[] = [];
-    let m;
-    const re = new RegExp(pattern.source, 'g');
-    while ((m = re.exec(html)) !== null) {
-      results.push(m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim());
-    }
-    return results;
-  };
-
   // Başlık
   const baslik = get(/<h1[^>]*class="[^"]*classifiedDetailTitle[^"]*"[^>]*>([\s\S]*?)<\/h1>/) ||
                  get(/<h1[^>]*>([\s\S]*?)<\/h1>/);
@@ -31,34 +21,59 @@ function parseIlanDetay(html: string) {
                    get(/id="[^"]*price[^"]*"[^>]*>([\s\S]*?)<\//i);
   const fiyat = fiyatRaw ? parseInt(fiyatRaw.replace(/\./g, '').replace(/[^\d]/g, '')) || null : null;
 
-  // İlan özellikleri (classifiedInfoList içindeki li'ler)
+  // classifiedInfoList — tüm key/value çiftleri
   const ozellikler: Record<string, string> = {};
-  const liPattern = /<li[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>[\s\S]*?<\/li>/g;
+  const liRegex = /<li[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>[\s\S]*?<\/li>/g;
   let liM;
-  while ((liM = liPattern.exec(html)) !== null) {
+  while ((liM = liRegex.exec(html)) !== null) {
     const key = liM[1].replace(/<[^>]+>/g, '').trim();
     const val = liM[2].replace(/<[^>]+>/g, '').trim();
-    if (key && val) ozellikler[key] = val;
+    if (key && val && key.length < 50) ozellikler[key] = val;
   }
+
+  // Resimler
+  const resimler: string[] = [];
+  const imgRegex = /data-src="(https?:\/\/[^"]*shbdn\.com[^"]+)"/g;
+  let imgM;
+  while ((imgM = imgRegex.exec(html)) !== null) {
+    if (!resimler.includes(imgM[1])) resimler.push(imgM[1]);
+    if (resimler.length >= 8) break;
+  }
+
+  // Satıcı
+  const satici = get(/class="[^"]*classifiedUserName[^"]*"[^>]*>([\s\S]*?)<\//) ||
+                 get(/class="[^"]*advertiserName[^"]*"[^>]*>([\s\S]*?)<\//);
 
   // Açıklama
   const aciklama = get(/class="[^"]*classifiedDescription[^"]*"[^>]*>([\s\S]*?)<\/div>/);
 
-  // Satıcı / İlan sahibi
-  const satici = get(/class="[^"]*classifiedUserName[^"]*"[^>]*>([\s\S]*?)<\//) ||
-                 get(/class="[^"]*advertiser-name[^"]*"[^>]*>([\s\S]*?)<\//);
+  // İlan no
+  const ilanNo = get(/İlan No[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/) ||
+                 get(/data-id="(\d+)"/);
 
-  // Konum
-  const konum = get(/class="[^"]*classifiedInfo[^"]*location[^"]*"[^>]*>([\s\S]*?)<\//) ||
-                get(/class="[^"]*location[^"]*"[^>]*>([\s\S]*?)<\//);
-
-  // Resimler
-  const resimler = getAll(/data-src="(https:\/\/i\d\.shbdn\.com[^"]+)"/);
-
-  // İlan tarihi
-  const tarih = get(/class="[^"]*classifiedInfoList[^"]*"[\s\S]*?Tarih[\s\S]*?<span[^>]*>([\s\S]*?)<\/span>/);
-
-  return { baslik, fiyat, ozellikler, satici, konum, tarih, resimler: resimler.slice(0, 10), aciklama: aciklama?.slice(0, 500) };
+  return {
+    baslik,
+    fiyat,
+    ilanNo,
+    satici,
+    aciklama: aciklama?.slice(0, 800) ?? null,
+    resimler,
+    ozellikler,
+    // Sık kullanılan alanlar doğrudan
+    marka: ozellikler['Marka'] ?? null,
+    model: ozellikler['Model'] ?? null,
+    varyant: ozellikler['Donanım Paketi'] ?? ozellikler['Versiyon'] ?? ozellikler['Seri'] ?? null,
+    yil: ozellikler['Yıl'] ?? null,
+    km: ozellikler['Kilometre'] ? parseInt(ozellikler['Kilometre'].replace(/\./g, '')) || null : null,
+    yakit: ozellikler['Yakıt Tipi'] ?? null,
+    vites: ozellikler['Vites Tipi'] ?? null,
+    kasaTipi: ozellikler['Kasa Tipi'] ?? null,
+    motorHacmi: ozellikler['Motor Hacmi'] ?? null,
+    motorGucu: ozellikler['Motor Gücü'] ?? null,
+    renk: ozellikler['Renk'] ?? null,
+    hasar: ozellikler['Hasar Kaydı'] ?? null,
+    kimden: ozellikler['Kimden'] ?? null,
+  };
 }
 
 export async function GET(request: Request) {
@@ -79,18 +94,24 @@ export async function GET(request: Request) {
     geoCode: 'tr',
   });
 
-  const r = await fetch(`https://api.scrape.do/?${params}`, {
-    signal: AbortSignal.timeout(25000),
-  });
+  let html: string;
+  try {
+    const r = await fetch(`https://api.scrape.do/?${params}`, {
+      signal: AbortSignal.timeout(25000),
+    });
 
-  if (!r.ok) {
-    return NextResponse.json({ error: `scrape.do: HTTP ${r.status}` }, { status: 502 });
+    if (!r.ok) {
+      const errText = await r.text();
+      return NextResponse.json({ error: `scrape.do: HTTP ${r.status}`, detail: errText.slice(0, 200) }, { status: 502 });
+    }
+
+    html = await r.text();
+  } catch (e: unknown) {
+    return NextResponse.json({ error: `Fetch hatası: ${e instanceof Error ? e.message : e}` }, { status: 502 });
   }
 
-  const html = await r.text();
-
-  if (html.includes('sahibinden.com Giriş') || html.includes('Giriş Yap')) {
-    return NextResponse.json({ error: 'sahibinden login duvarı — scrape.do TR IP çalışmıyor' }, { status: 403 });
+  if (html.includes('sahibinden.com Giriş') || (html.includes('Giriş Yap') && !html.includes('classifiedDetail'))) {
+    return NextResponse.json({ error: 'sahibinden login duvarı' }, { status: 403 });
   }
 
   const data = parseIlanDetay(html);

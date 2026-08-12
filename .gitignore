@@ -3,3 +3,16 @@
 node_modules/
 dist/
 *-parsed.json
+
+# ETL geçici dosyaları
+etl/*.html
+etl/*.png
+etl/*.pdf
+etl/*.txt
+etl/*.bin
+etl/*.xlsx
+etl/tefas-data/
+etl/sahibinden-data/
+etl/tefas-*.json
+arabam-*.html
+Renault-*.pdf

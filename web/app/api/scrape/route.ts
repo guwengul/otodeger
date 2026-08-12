@@ -199,10 +199,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'SCRAPEDO_TOKEN env eksik' }, { status: 500 });
   }
 
+  const isSahibinden = url.includes('sahibinden.com');
   const params = new URLSearchParams({
     token: SCRAPEDO_TOKEN,
     url,
     geoCode: 'tr',
+    ...(isSahibinden ? { super: 'true' } : {}),
   });
 
   let html: string;
